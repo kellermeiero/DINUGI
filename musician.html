@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Musiker-Anzeige">
+    <meta name="theme-color" content="#1e3c72">
+    <link rel="manifest" href="manifest.json">
+    <title>Musiker - Live Anzeige</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .display-container {
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            position: relative;
+            flex-shrink: 0;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .connection-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .display-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .number-display {
+            font-size: clamp(6rem, 25vw, 15rem);
+            font-weight: 900;
+            color: #2c3e50;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.15);
+            animation: numberAppear 0.6s ease-out;
+            text-align: center;
+            line-height: 0.9;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        .text-display {
+            font-size: clamp(2rem, 8vw, 4rem);
+            font-weight: 700;
+            color: #2c3e50;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            animation: textAppear 0.6s ease-out;
+            text-align: center;
+            line-height: 1.1;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            word-wrap: break-word;
+            max-width: 100%;
+            padding: 0 10px;
+        }
+
+        @keyframes numberAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) rotate(-10deg);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.1) rotate(2deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        @keyframes textAppear {
+            0% {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .waiting-message {
+            font-size: clamp(1.2rem, 5vw, 1.8rem);
+            color: #6c757d;
+            text-align: center;
+            font-style: italic;
+            animation: fadeInOut 3s infinite;
+            padding: 20px;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .footer {
+            background: rgba(248, 249, 250, 0.95);
+            padding: 8px 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.75rem;
+            border-top: 1px solid rgba(222, 226, 230, 0.8);
+            flex-shrink: 0;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* Spezielle Animationen */
+        .flash-animation {
+            animation: flash 0.5s ease-in-out;
+        }
+
+        @keyframes flash {
+            0%, 100% { background: linear-gradient(45deg, #f8f9fa, #e9ecef); }
+            50% { background: linear-gradient(45deg, #fff3cd, #ffeaa7); }
+        }
+
+        .important-glow {
+            position: relative;
+        }
+
+        .important-glow::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            right: -20px;
+            bottom: -20px;
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53, #4ECDC4, #45B7D1);
+            border-radius: 20px;
+            z-index: -1;
+            animation: glow 2s infinite;
+            opacity: 0.7;
+        }
+
+        @keyframes glow {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+
+        /* Mobile Optimierungen */
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px 15px;
+            }
+
+            .header h1 {
+                font-size: 1.1rem;
+            }
+
+            .connection-info {
+                font-size: 0.75rem;
+            }
+
+            .display-area {
+                padding: 20px 15px;
+            }
+
+            .footer {
+                padding: 6px 15px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* Sehr kleine Handys */
+        @media (max-width: 320px) {
+            .number-display {
+                font-size: clamp(4rem, 20vw, 10rem);
+            }
+            
+            .text-display {
+                font-size: clamp(1.5rem, 6vw, 2.5rem);
+            }
+        }
+
+        /* Landscape Optimierung */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .header {
+                padding: 6px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1rem;
+            }
+            
+            .connection-info {
+                display: none;
+            }
+            
+            .display-area {
+                padding: 15px;
+            }
+            
+            .footer {
+                padding: 4px 15px;
+                font-size: 0.65rem;
+            }
+        }
+
+        /* Install-Prompt */
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(33, 150, 243, 0.95);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            animation: slideUp 0.5s ease-out;
+            z-index: 1000;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .install-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .install-btn {
+            background: white;
+            color: #2196F3;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .install-btn.dismiss {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="display-container">
+        <div class="header">
+            <h1>🎵 Live Musiker-Anzeige</h1>
+            <div class="connection-info">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="connectionStatus">Verbindung wird hergestellt...</span>
+            </div>
+        </div>
+
+        <div class="display-area" id="displayArea">
+            <div class="waiting-message" id="waitingMessage">
+                Warten auf Dirigent...
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="connection-status">
+                <span>Letzte Aktualisierung: <span id="lastUpdate">-</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Install Prompt -->
+    <div class="install-prompt" id="installPrompt" style="display: none;">
+        <div>📱 App installieren für bessere Nutzung</div>
+        <div class="install-buttons">
+            <button class="install-btn" onclick="installApp()">Installieren</button>
+            <button class="install-btn dismiss" onclick="dismissInstall()">Später</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Firebase importieren
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
+
+        // ⚠️ GLEICHE FIREBASE CONFIG WIE IN DIRIGENT-APP:
+        const firebaseConfig = {
+            apiKey: "AIzaSyB6NWZhno-WvG3N1SSEB_dHyeNlaBXG1Ew",
+            authDomain: "digitalesnummerngirl.firebaseapp.com",
+            databaseURL: "https://digitalesnummerngirl-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "digitalesnummerngirl",
+            storageBucket: "digitalesnummerngirl.firebasestorage.app",
+            messagingSenderId: "267027480922",
+            appId: "1:267027480922:web:1a368c1de7e63cd9f93363"
+        };
+
+        // Firebase initialisieren
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Globale Variablen
+        let lastDisplayedContent = '';
+        let lastUpdateTime = 0;
+        let isConnected = false;
+
+        // Verhindere Zoom bei doppeltem Tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Verhindere Kontext-Menü
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
+        // Connection Status überwachen
+        const connectedRef = ref(database, '.info/connected');
+        onValue(connectedRef, (snapshot) => {
+            isConnected = snapshot.val();
+            updateConnectionStatus();
+        });
+
+        function updateConnectionStatus() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const connectionStatus = document.getElementById('connectionStatus');
+            
+            if (isConnected) {
+                statusIndicator.classList.remove('disconnected');
+                connectionStatus.textContent = 'Live verbunden';
+            } else {
+                statusIndicator.classList.add('disconnected');
+                connectionStatus.textContent = 'Offline...';
+            }
+        }
+
+        // Current Display überwachen
+        const displayRef = ref(database, 'currentDisplay');
+        onValue(displayRef, (snapshot) => {
+            const data = snapshot.val();
+            
+            if (data && data.content && data.timestamp > lastUpdateTime) {
+                showContent(data.content);
+                lastDisplayedContent = data.content;
+                lastUpdateTime = data.timestamp;
+                updateLastUpdateTime();
+                
+                // Haptic Feedback bei neuer Nachricht
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            } else if (!data) {
+                showWaiting();
+            }
+        });
+
+        function showContent(content) {
+            const displayArea = document.getElementById('displayArea');
+            
+            // Flash-Animation hinzufügen
+            displayArea.classList.add('flash-animation');
+            setTimeout(() => displayArea.classList.remove('flash-animation'), 500);
+            
+            // Prüfen ob es eine Zahl ist
+            const isNumber = /^\d+$/.test(content);
+            
+            let displayElement;
+            if (isNumber) {
+                displayElement = document.createElement('div');
+                displayElement.className = 'number-display';
+                displayElement.textContent = content;
+                
+                // Glow-Effekt für wichtige Nummern
+                if (['1', '0', '100'].includes(content)) {
+                    displayArea.classList.add('important-glow');
+                    setTimeout(() => displayArea.classList.remove('important-glow'), 3000);
+                }
+            } else {
+                displayElement = document.createElement('div');
+                displayElement.className = 'text-display';
+                displayElement.textContent = content;
+            }
+            
+            // Alten Content ersetzen
+            displayArea.innerHTML = '';
+            displayArea.appendChild(displayElement);
+        }
+
+        function showWaiting() {
+            const displayArea = document.getElementById('displayArea');
+            displayArea.innerHTML = `
+                <div class="waiting-message" id="waitingMessage">
+                    Warten auf Dirigent...
+                </div>
+            `;
+        }
+
+        function updateLastUpdateTime() {
+            const lastUpdateElement = document.getElementById('lastUpdate');
+            const now = new Date();
+            lastUpdateElement.textContent = now.toLocaleTimeString('de-DE');
+        }
+
+        // Screen Wake Lock
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Screen Wake Lock aktiviert');
+                    
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Screen Wake Lock freigegeben');
+                    });
+                }
+            } catch (err) {
+                console.log('Wake Lock nicht verfügbar:', err);
+            }
+        }
+
+        // Wake Lock bei Sichtbarkeitsänderung
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        // PWA Installation
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Install Prompt nach 5 Sekunden anzeigen (nur wenn localStorage verfügbar ist)
+            setTimeout(() => {
+                try {
+                    if (!localStorage.getItem('installDismissed')) {
+                        document.getElementById('installPrompt').style.display = 'block';
+                    }
+                } catch (err) {
+                    // localStorage nicht verfügbar - Prompt trotzdem anzeigen
+                    document.getElementById('installPrompt').style.display = 'block';
+                }
+            }, 5000);
+        });
+
+        window.installApp = async function() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    console.log('App installiert');
+                }
+                
+                deferredPrompt = null;
+                document.getElementById('installPrompt').style.display = 'none';
+            }
+        };
+
+        window.dismissInstall = function() {
+            document.getElementById('installPrompt').style.display = 'none';
+            try {
+                localStorage.setItem('installDismissed', 'true');
+            } catch (err) {
+                // localStorage nicht verfügbar - ignorieren
+                console.log('localStorage nicht verfügbar');
+            }
+        };
+
+        // Vollbild-Toggle bei langem Tap
+        let touchStartTime = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartTime = Date.now();
+        });
+
+        document.addEventListener('touchend', (e) => {
+            const touchDuration = Date.now() - touchStartTime;
+            if (touchDuration > 1000) { // 1 Sekunde
+                toggleFullscreen();
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(200);
+                }
+            }
+        });
+
+        function toggleFullscreen() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+        }
+
+        // Service Worker registrieren
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(() => {
+                console.log('Service Worker registriert');
+            }).catch((error) => {
+                console.log('Service Worker Registrierung fehlgeschlagen:', error);
+            });
+        }
+
+        // Orientierung verhindern
+        function lockOrientation() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait').catch(() => {
+                    // Ignorieren falls nicht unterstützt
+                });
+            }
+        }
+
+        // Viewport Fix für mobile Browser
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        // Event Listeners
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                setViewportHeight();
+            }, 300);
+        });
+
+        window.addEventListener('resize', setViewportHeight);
+
+        // Initial setup
+        window.addEventListener('load', async () => {
+            await requestWakeLock();
+            lockOrientation();
+            setViewportHeight();
+            updateConnectionStatus();
+        });
+
+        // Bei Fokus-Wiedererlangung
+        window.addEventListener('focus', () => {
+            requestWakeLock();
+        });
+    </script>
+</body>
+</html>
